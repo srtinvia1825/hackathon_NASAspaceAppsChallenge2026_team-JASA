@@ -29,18 +29,12 @@ with st.sidebar:
         except Exception:
             pass
 
-    api_key = st.text_input(
-        "Gemini API Key",
-        value=env_key,
-        type="password",
-        help="Get your free gemini API key in: https://aistudio.google.com/"
-    )
+    api_key = env_key
 
     if not api_key:
         st.warning("⚠️ Enter your Gemini API Key to activate the assistant.")
         st.stop()
 
-    st.success("API Key detected ✅")
     st.divider()
 
     # 2. Gestión de documentos en data/
