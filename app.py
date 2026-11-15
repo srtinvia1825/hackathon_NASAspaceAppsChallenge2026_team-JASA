@@ -7,18 +7,18 @@ from rag_engine import RAGEngine
 load_dotenv()
 
 st.set_page_config(
-    page_title="RAG AI - NASA Hackathon 2026",
+    page_title="Team JASA - Hackathon NASA space apps challenge 2026 - Flame in free fall challenge",
     page_icon="🚀",
     layout="wide"
 )
 
 # Encabezado principal
-st.title("🚀 Asistente RAG - NASA Hackathon 2026")
-st.caption("Consulta inteligente basada en tu repositorio de datos con Gemini 2.5")
+st.title("SI assistant - Flame in free fall challenge")
+st.caption("AI organizer for the NASA PSI documents")
 
 # Barra lateral para configuración
 with st.sidebar:
-    st.header("⚙️ Configuración")
+    st.header("⚙️ Configuration")
     
     # 1. API Key de Gemini (detecta .env local o Secrets de Streamlit Cloud)
     env_key = os.getenv("GEMINI_API_KEY", "")
@@ -33,63 +33,61 @@ with st.sidebar:
         "Gemini API Key",
         value=env_key,
         type="password",
-        help="Obtén tu API key gratis en https://aistudio.google.com/"
+        help="Get your free gemini API key in: https://aistudio.google.com/"
     )
 
     if not api_key:
-        st.warning("⚠️ Ingresa tu API Key de Gemini para activar el asistente.")
+        st.warning("⚠️ Enter your Gemini API Key to activate the assistant.")
         st.stop()
 
-    st.success("API Key detectada ✅")
+    st.success("API Key detected ✅")
     st.divider()
 
     # 2. Gestión de documentos en data/
-    st.subheader("📁 Datos de conocimiento (`data/`)")
+    st.subheader("📁 PSI data")
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
     files = [f for f in os.listdir(data_dir) if not f.startswith(".")]
     
     if files:
-        st.write(f"Archivos encontrados ({len(files)}):")
+        st.write(f"Found archives ({len(files)}):")
         for f in files:
             st.markdown(f"- 📄 `{f}`")
     else:
-        st.info("Coloca tus archivos (.txt, .md, .pdf, .csv, .json) en la carpeta `data/`.")
+        st.info("Place your files (.txt, .md, .pdf, .csv, .json) in the `data/` folder.")
 
     # Botón para reindexar
-    reindex = st.button("🔄 Reindexar Documentos", use_container_width=True)
+    reindex = st.button("🔄 Reindex Documents", use_container_width=True)
 
 # Inicializar motor RAG en el estado de la sesión
 if "rag" not in st.session_state or reindex:
-    with st.spinner("Cargando documentos y construyendo índice..."):
+    with st.spinner("Loading documents and building index..."):
         try:
             rag = RAGEngine(api_key=api_key)
             rag.load_data(data_dir=data_dir)
             rag.build_index(force_refresh=reindex)
             st.session_state["rag"] = rag
-            mode = "🔎 BM25 local" if rag.use_local_bm25 else "🧠 Embeddings Gemini"
-            st.sidebar.success(f"¡Índice listo! {len(rag.chunks)} fragmentos • {mode}")
         except Exception as e:
-            st.error(f"Error crítico inicializando RAG: {e}")
+            st.error(f"Error critical initializing RAG: {e}")
             st.stop()
 
 # Historial de conversación
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "¡Hola! Soy tu asistente para el Hackathon NASA 2026. Pregúntame cualquier cosa sobre los datos que has cargado."}
+        {"role": "assistant", "content": "Hello! I'm your AI assistant for the NASA PSI documents. Ask me anything about the loaded data"}
     ]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "sources" in msg and msg["sources"]:
-            with st.expander("📚 Fuentes consultadas"):
+            with st.expander("📚 Checked sources"):
                 for chunk, score in msg["sources"]:
                     st.caption(f"**{chunk['source']}** (Similitud: {score:.2f})")
                     st.text(chunk["text"][:300] + ("..." if len(chunk["text"]) > 300 else ""))
 
 # Input del usuario
-if user_prompt := st.chat_input("Escribe tu pregunta sobre los datos..."):
+if user_prompt := st.chat_input("Ask anything about the loaded data..."):
     # Guardar y mostrar mensaje del usuario
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user"):
@@ -97,7 +95,7 @@ if user_prompt := st.chat_input("Escribe tu pregunta sobre los datos..."):
 
     # Generar respuesta con RAG
     with st.chat_message("assistant"):
-        with st.spinner("Buscando en tus documentos y consultando a Gemini..."):
+        with st.spinner("Searching data..."):
             try:
                 rag: RAGEngine = st.session_state["rag"]
                 result = rag.query(user_prompt, top_k=4)
@@ -105,7 +103,7 @@ if user_prompt := st.chat_input("Escribe tu pregunta sobre los datos..."):
                 st.markdown(result["answer"])
                 
                 if result["sources"]:
-                    with st.expander("📚 Fuentes consultadas"):
+                    with st.expander("📚 Checked recources"):
                         for chunk, score in result["sources"]:
                             st.caption(f"**{chunk['source']}** (Similitud: {score:.2f})")
                             st.text(chunk["text"][:300] + ("..." if len(chunk["text"]) > 300 else ""))
@@ -116,6 +114,6 @@ if user_prompt := st.chat_input("Escribe tu pregunta sobre los datos..."):
                     "sources": result["sources"]
                 })
             except Exception as e:
-                error_msg = f"Ocurrió un error al procesar tu consulta: {e}"
+                error_msg = f"An error occurred while processing your query: {e}"
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
