@@ -60,9 +60,35 @@ def chunk_text(text: str, source: str, chunk_size: int = 800, overlap: int = 150
 class RAGEngine:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
+        # Usamos v1beta donde text-embedding-004 está siempre disponible
+        try:
+            self.client = genai.Client(
+                api_key=api_key,
+                http_options=types.HttpOptions(api_version="v1beta")
+            )
+        except Exception:
+            self.client = genai.Client(api_key=api_key)
         self.chunks: List[Dict] = []
         self.embeddings: np.ndarray = np.array([])
+        self.embedding_model = "text-embedding-004"
+
+    def _embed_batch(self, batch):
+        """Genera embeddings con fallback automático si un modelo no está disponible."""
+        try:
+            return self.client.models.embed_content(
+                model=self.embedding_model,
+                contents=batch,
+            )
+        except Exception as e:
+            err_str = str(e).lower()
+            if "not found" in err_str and self.embedding_model != "embedding-001":
+                print(f"[Aviso] {self.embedding_model} no encontrado, usando embedding-001 como respaldo.")
+                self.embedding_model = "embedding-001"
+                return self.client.models.embed_content(
+                    model="embedding-001",
+                    contents=batch,
+                )
+            raise e
 
     def load_data(self, data_dir: str = "data") -> int:
         """Carga documentos de la carpeta data/ y los fragmenta."""
@@ -115,10 +141,7 @@ class RAGEngine:
         batch_size = 50
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            response = self.client.models.embed_content(
-                model="text-embedding-004",
-                contents=batch,
-            )
+            response = self._embed_batch(batch)
             for emb in response.embeddings:
                 all_vectors.append(emb.values)
 
@@ -133,11 +156,8 @@ class RAGEngine:
         if len(self.embeddings) == 0 or not self.chunks:
             return []
 
-        # Vectorizar la pregunta
-        resp = self.client.models.embed_content(
-            model="text-embedding-004",
-            contents=[query]
-        )
+        # Vectorizar la pregunta con fallback
+        resp = self._embed_batch([query])
         query_vec = np.array(resp.embeddings[0].values)
 
         # Similitud coseno matricial con NumPy
@@ -177,14 +197,28 @@ PREGUNTA DEL USUARIO:
 {question}
 """
 
-        response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.2,
-            )
-        )
+        response = None
+        models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        last_err = None
+        for model_name in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.2,
+                    )
+                )
+                break
+            except Exception as e:
+                last_err = e
+                if "not found" in str(e).lower():
+                    continue
+                raise e
+
+        if response is None:
+            raise last_err or Exception("No se pudo conectar con ningún modelo de Gemini.")
 
         return {
             "answer": response.text,
