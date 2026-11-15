@@ -37,25 +37,34 @@ with st.sidebar:
 
     st.divider()
 
-    # 2. Gestión de documentos en data/
-    st.subheader("📁 PSI data")
+    # 2. Explorador de documentos en data/
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
-    files = pdf_files = sorted(
-    file for file in files
-    if file.lower().endswith(".pdf")
-)
+    pdf_files = sorted(
+        os.path.relpath(os.path.join(root, filename), data_dir)
+        for root, _, filenames in os.walk(data_dir)
+        for filename in filenames
+        if filename.lower().endswith(".pdf") and not filename.startswith(".")
+    )
+    categories = {"Combustion Science": pdf_files}
 
-with st.expander(
-    f"Combustion Science ({len(pdf_files)} PDFs)",
-    expanded=True
-):
-    if pdf_files:
-        for file in pdf_files:
-            st.markdown(f"- 📄 `{file}`")
-    else:
-        st.info("No PDF files found.")
-        [f for f in os.listdir(data_dir) if not f.startswith(".")]
+    with st.expander("🗂️ PSI data", expanded=False):
+        folder_options = ["Select a folder", *categories.keys()]
+        selected_folder = st.radio(
+            "Folders",
+            options=folder_options,
+            format_func=lambda folder: (
+                "Select a folder" if folder == "Select a folder" else f"📁 {folder}"
+            ),
+            label_visibility="collapsed",
+        )
+        if selected_folder != "Select a folder":
+            folder_files = categories[selected_folder]
+            if folder_files:
+                for filename in folder_files:
+                    st.markdown(f"- 📄 `{filename}`")
+            else:
+                st.info("No PDF files found in this folder.")
     
     # Botón para reindexar
     reindex = st.button("🔄 Reindex Documents", use_container_width=True)
