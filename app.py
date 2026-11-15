@@ -61,15 +61,16 @@ with st.sidebar:
 
 # Inicializar motor RAG en el estado de la sesión
 if "rag" not in st.session_state or reindex:
-    with st.spinner("Construyendo índice vectorial con Gemini..."):
+    with st.spinner("Cargando documentos y construyendo índice..."):
         try:
             rag = RAGEngine(api_key=api_key)
-            num_chunks = rag.load_data(data_dir=data_dir)
+            rag.load_data(data_dir=data_dir)
             rag.build_index(force_refresh=reindex)
             st.session_state["rag"] = rag
-            st.sidebar.success(f"¡Índice listo! {len(rag.chunks)} fragmentos cargados.")
+            mode = "🔎 BM25 local" if rag.use_local_bm25 else "🧠 Embeddings Gemini"
+            st.sidebar.success(f"¡Índice listo! {len(rag.chunks)} fragmentos • {mode}")
         except Exception as e:
-            st.error(f"Error inicializando RAG: {e}")
+            st.error(f"Error crítico inicializando RAG: {e}")
             st.stop()
 
 # Historial de conversación
