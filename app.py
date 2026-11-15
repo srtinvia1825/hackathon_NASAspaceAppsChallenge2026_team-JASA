@@ -41,15 +41,22 @@ with st.sidebar:
     st.subheader("📁 PSI data")
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
-    files = [f for f in os.listdir(data_dir) if not f.startswith(".")]
-    
-    if files:
-        st.write(f"Found archives ({len(files)}):")
-        for f in files:
-            st.markdown(f"- 📄 `{f}`")
-    else:
-        st.info("Place your files (.txt, .md, .pdf, .csv, .json) in the `data/` folder.")
+    files = pdf_files = sorted(
+    file for file in files
+    if file.lower().endswith(".pdf")
+)
 
+with st.expander(
+    f"Combustion Science ({len(pdf_files)} PDFs)",
+    expanded=True
+):
+    if pdf_files:
+        for file in pdf_files:
+            st.markdown(f"- 📄 `{file}`")
+    else:
+        st.info("No PDF files found.")
+        [f for f in os.listdir(data_dir) if not f.startswith(".")]
+    
     # Botón para reindexar
     reindex = st.button("🔄 Reindex Documents", use_container_width=True)
 
