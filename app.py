@@ -48,18 +48,9 @@ with st.sidebar:
     )
     categories = {"Combustion Science": pdf_files}
 
-    with st.expander("🗂️ PSI data", expanded=False):
-        folder_options = ["Select a folder", *categories.keys()]
-        selected_folder = st.radio(
-            "Folders",
-            options=folder_options,
-            format_func=lambda folder: (
-                "Select a folder" if folder == "Select a folder" else f"📁 {folder}"
-            ),
-            label_visibility="collapsed",
-        )
-        if selected_folder != "Select a folder":
-            folder_files = categories[selected_folder]
+    st.subheader("🗂️ PSI data")
+    for folder, folder_files in categories.items():
+        with st.expander(f"📁 {folder}", expanded=False):
             if folder_files:
                 for filename in folder_files:
                     st.markdown(f"- 📄 `{filename}`")
