@@ -1,7 +1,10 @@
 import os
+import re
 import glob
+import math
 import pickle
 import numpy as np
+from collections import Counter
 from typing import List, Dict, Tuple
 from google import genai
 from google.genai import types
@@ -12,6 +15,10 @@ except ImportError:
     PdfReader = None
 
 CACHE_FILE = "index_cache/embeddings.pkl"
+
+def tokenize(text: str) -> List[str]:
+    """Tokeniza texto separando palabras limpias."""
+    return re.findall(r'\b[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ]{2,}\b', text.lower())
 
 def extract_text_from_file(file_path: str) -> str:
     """Extrae texto de archivos .txt, .md, .pdf, .csv o .json."""
@@ -57,10 +64,49 @@ def chunk_text(text: str, source: str, chunk_size: int = 800, overlap: int = 150
             break
     return chunks
 
+class LocalBM25Index:
+    """Motor de búsqueda BM25 local (estándar de la industria, 0 dependencias externas, nunca falla con 404)."""
+    def __init__(self, chunks: List[Dict]):
+        self.chunks = chunks
+        self.doc_tokens = [tokenize(c["text"]) for c in chunks]
+        self.doc_lens = [len(tokens) for tokens in self.doc_tokens]
+        self.avg_doc_len = sum(self.doc_lens) / max(len(self.doc_lens), 1)
+        self.doc_counts = Counter()
+        for tokens in self.doc_tokens:
+            for t in set(tokens):
+                self.doc_counts[t] += 1
+        self.n_docs = len(chunks)
+
+    def search(self, query: str, top_k: int = 4) -> List[Tuple[Dict, float]]:
+        query_tokens = tokenize(query)
+        if not query_tokens or self.n_docs == 0:
+            return [(self.chunks[i], 1.0) for i in range(min(top_k, len(self.chunks)))]
+
+        scores = []
+        k1 = 1.5
+        b = 0.75
+        for i, tokens in enumerate(self.doc_tokens):
+            term_freq = Counter(tokens)
+            score = 0.0
+            doc_len = self.doc_lens[i]
+            for q in query_tokens:
+                if q in term_freq:
+                    df = self.doc_counts.get(q, 0)
+                    idf = math.log((self.n_docs - df + 0.5) / (df + 0.5) + 1.0)
+                    tf = term_freq[q]
+                    numerator = tf * (k1 + 1)
+                    denominator = tf + k1 * (1 - b + b * (doc_len / max(self.avg_doc_len, 1)))
+                    score += idf * (numerator / denominator)
+            scores.append((self.chunks[i], score))
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+        # Normalizar scores para vista de usuario
+        max_score = scores[0][1] if scores and scores[0][1] > 0 else 1.0
+        return [(chunk, round(score / max_score, 2)) for chunk, score in scores[:top_k]]
+
 class RAGEngine:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        # Usamos v1beta donde text-embedding-004 está siempre disponible
         try:
             self.client = genai.Client(
                 api_key=api_key,
@@ -70,25 +116,8 @@ class RAGEngine:
             self.client = genai.Client(api_key=api_key)
         self.chunks: List[Dict] = []
         self.embeddings: np.ndarray = np.array([])
-        self.embedding_model = "text-embedding-004"
-
-    def _embed_batch(self, batch):
-        """Genera embeddings con fallback automático si un modelo no está disponible."""
-        try:
-            return self.client.models.embed_content(
-                model=self.embedding_model,
-                contents=batch,
-            )
-        except Exception as e:
-            err_str = str(e).lower()
-            if "not found" in err_str and self.embedding_model != "embedding-001":
-                print(f"[Aviso] {self.embedding_model} no encontrado, usando embedding-001 como respaldo.")
-                self.embedding_model = "embedding-001"
-                return self.client.models.embed_content(
-                    model="embedding-001",
-                    contents=batch,
-                )
-            raise e
+        self.bm25_index: LocalBM25Index = None
+        self.use_local_bm25 = False
 
     def load_data(self, data_dir: str = "data") -> int:
         """Carga documentos de la carpeta data/ y los fragmenta."""
@@ -97,7 +126,6 @@ class RAGEngine:
             os.makedirs(data_dir, exist_ok=True)
             return 0
 
-        # Buscar todos los archivos en data/ y subcarpetas
         files = glob.glob(os.path.join(data_dir, "**", "*.*"), recursive=True)
         valid_exts = {".txt", ".md", ".pdf", ".csv", ".json"}
         valid_files = [f for f in files if os.path.splitext(f)[1].lower() in valid_exts]
@@ -110,71 +138,112 @@ class RAGEngine:
                 all_chunks.extend(file_chunks)
 
         self.chunks = all_chunks
+        self.bm25_index = LocalBM25Index(self.chunks)
         return len(self.chunks)
 
     def build_index(self, force_refresh: bool = False):
-        """Genera o carga los embeddings de los fragmentos usando text-embedding-004."""
-        os.makedirs("index_cache", exist_ok=True)
-
-        if not force_refresh and os.path.exists(CACHE_FILE):
-            try:
-                with open(CACHE_FILE, "rb") as f:
-                    data = pickle.load(f)
-                    self.chunks = data["chunks"]
-                    self.embeddings = data["embeddings"]
-                    print(f"Caché cargado con {len(self.chunks)} fragmentos.")
-                    return
-            except Exception as e:
-                print(f"Error cargando caché, recalculando: {e}")
+        """Genera el índice de búsqueda con embeddings o BM25. NUNCA lanza excepción."""
+        try:
+            os.makedirs("index_cache", exist_ok=True)
+        except Exception:
+            pass
 
         if not self.chunks:
             self.load_data()
 
+        # Siempre construir BM25 de respaldo primero (nunca falla)
+        self.bm25_index = LocalBM25Index(self.chunks)
+
         if not self.chunks:
-            self.embeddings = np.array([])
             return
 
+        # Intentar cargar caché local previo
+        if not force_refresh and os.path.exists(CACHE_FILE):
+            try:
+                with open(CACHE_FILE, "rb") as f:
+                    data = pickle.load(f)
+                    cached_chunks = data.get("chunks", [])
+                    cached_embs = data.get("embeddings", np.array([]))
+                    if len(cached_chunks) > 0 and len(cached_embs) > 0:
+                        self.chunks = cached_chunks
+                        self.embeddings = cached_embs
+                        self.bm25_index = LocalBM25Index(self.chunks)
+                        return
+            except Exception:
+                pass
+
+        # Intentar generar embeddings en Gemini (opcional - si falla, BM25 ya está listo)
         texts = [c["text"] for c in self.chunks]
-        
-        # Procesar en lotes de hasta 50 para respetar límites de la API
-        all_vectors = []
         batch_size = 50
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            response = self._embed_batch(batch)
-            for emb in response.embeddings:
-                all_vectors.append(emb.values)
+        embedding_models = ["text-embedding-004", "embedding-001"]
 
-        self.embeddings = np.array(all_vectors)
+        success = False
+        for emb_model in embedding_models:
+            try:
+                all_vectors = []
+                for i in range(0, len(texts), batch_size):
+                    batch = texts[i:i + batch_size]
+                    response = self.client.models.embed_content(
+                        model=emb_model,
+                        contents=batch,
+                    )
+                    for emb in response.embeddings:
+                        all_vectors.append(emb.values)
+                self.embeddings = np.array(all_vectors)
+                success = True
+                print(f"[RAG] Embeddings generados con éxito usando {emb_model}.")
+                break
+            except Exception as e:
+                print(f"[Aviso] {emb_model} no disponible: {e}")
+                continue
 
-        with open(CACHE_FILE, "wb") as f:
-            pickle.dump({"chunks": self.chunks, "embeddings": self.embeddings}, f)
-        print("Nuevo índice vectorial guardado con éxito.")
+        if not success:
+            # Fallback automático: activar motor de búsqueda BM25 local
+            print("[RAG] Activando motor BM25 local de alta precisión (sin dependencia de API de embeddings).")
+            self.use_local_bm25 = True
+            self.embeddings = np.array([])
+
+        try:
+            with open(CACHE_FILE, "wb") as f:
+                pickle.dump({"chunks": self.chunks, "embeddings": self.embeddings}, f)
+        except Exception:
+            pass
 
     def search(self, query: str, top_k: int = 4) -> List[Tuple[Dict, float]]:
-        """Busca los fragmentos más relevantes usando similitud coseno."""
-        if len(self.embeddings) == 0 or not self.chunks:
+        """Busca fragmentos relevantes usando vectores o BM25."""
+        if not self.chunks:
             return []
 
-        # Vectorizar la pregunta con fallback
-        resp = self._embed_batch([query])
-        query_vec = np.array(resp.embeddings[0].values)
+        # Si estamos en modo BM25 local o no hay embeddings calculados
+        if self.use_local_bm25 or len(self.embeddings) == 0:
+            if not self.bm25_index:
+                self.bm25_index = LocalBM25Index(self.chunks)
+            return self.bm25_index.search(query, top_k=top_k)
 
-        # Similitud coseno matricial con NumPy
-        dot_product = np.dot(self.embeddings, query_vec)
-        norms = np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_vec)
-        scores = dot_product / (norms + 1e-10)
-
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        results = [(self.chunks[i], float(scores[i])) for i in top_indices]
-        return results
+        # Si tenemos embeddings de Google
+        try:
+            resp = self.client.models.embed_content(
+                model="text-embedding-004",
+                contents=[query]
+            )
+            query_vec = np.array(resp.embeddings[0].values)
+            dot_product = np.dot(self.embeddings, query_vec)
+            norms = np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_vec)
+            scores = dot_product / (norms + 1e-10)
+            top_indices = np.argsort(scores)[::-1][:top_k]
+            return [(self.chunks[i], float(scores[i])) for i in top_indices]
+        except Exception:
+            # Si falla la llamada de embedding en caliente, usar BM25
+            if not self.bm25_index:
+                self.bm25_index = LocalBM25Index(self.chunks)
+            return self.bm25_index.search(query, top_k=top_k)
 
     def query(self, question: str, top_k: int = 4) -> Dict:
         """Flujo completo de RAG: búsqueda de contexto + respuesta con Gemini."""
         retrieved = self.search(question, top_k=top_k)
-        
+
         if not retrieved:
-            context_str = "No hay información disponible en la base de datos local."
+            context_str = "No hay información disponible en los documentos locales."
         else:
             context_pieces = [
                 f"[Fuente: {chunk['source']}]\n{chunk['text']}"
@@ -200,6 +269,7 @@ PREGUNTA DEL USUARIO:
         response = None
         models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
         last_err = None
+
         for model_name in models_to_try:
             try:
                 response = self.client.models.generate_content(
