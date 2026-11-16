@@ -14,7 +14,7 @@ st.set_page_config(
 
 # Encabezado principal
 st.title("AI assistant - Flame in free fall challenge")
-st.caption("AI organizer for the NASA PSI documents")
+st.caption("AI organizer for the NASA PSI documents - fire in microgravity")
 
 # Barra lateral para configuración
 with st.sidebar:
@@ -40,10 +40,7 @@ with st.sidebar:
     # 2. Explorador de documentos en data/
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
-    category_names = [
-        "Archived Combustion Science",
-        "Multiphysics CFD Analysis of Thermo-Convective Effects on Cool Flame Dynamics",
-    ]
+    category_names = ["Researcher´s guide to combustion science", "ACME", "BASS", "DAFT", "FLEX", "SAME", "SPICE", "Saffire", "SLICE"]
     categories = {}
     for folder in category_names:
         category_dir = os.path.join(data_dir, folder)
@@ -134,4 +131,3 @@ if user_prompt := st.chat_input("Ask anything about the loaded data..."):
                 error_msg = f"An error occurred while processing your query: {e}"
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
-                
