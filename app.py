@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # Encabezado principal
-st.title("AI assistant - Flame in free fall challenge")
+st.title("SI assistant - Flame in free fall challenge")
 st.caption("AI organizer for the NASA PSI documents")
 
 # Barra lateral para configuración
@@ -48,18 +48,14 @@ with st.sidebar:
     )
     categories = {"Combustion Science": pdf_files}
 
-left_space, logo_col, title_col, right_space = st.columns(
-    [1, 0.6, 1.6, 1],
-    gap="small",
-    vertical_alignment="center",
-)
+    logo_col, title_col = st.columns([1, 4])
 
 with logo_col:
-    st.image("assets/nasa-logo.png", width=30)
+    st.image("assets/c:\\Users\\santi\\OneDrive\\Imágenes\\nasa-logo.png", width=36)
 
 with title_col:
     st.markdown(
-        "<h3 style='text-align: left;'>PSI data</h3>",
+        "<h3 style='text-align: center;'>PSI data</h3>",
         unsafe_allow_html=True
     )
 
