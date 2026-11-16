@@ -48,16 +48,21 @@ with st.sidebar:
     )
     categories = {"Combustion Science": pdf_files}
 
-    logo_col, title_col = st.columns([1, 4])
+left_space, logo_col, title_col, right_space = st.columns(
+    [1, 0.6, 1.6, 1],
+    gap="small",
+    vertical_alignment="center",
+)
 
-    with logo_col:
-        st.image("assets/nasa-logo.png", width=36)
+with logo_col:
+    st.image("assets/nasa-logo.png", width=30)
 
-    with title_col:
-        st.markdown(
-            "<h3 style='text-align: center;'>PSI data</h3>",
-            unsafe_allow_html=True
-        )
+with title_col:
+    st.markdown(
+        "<div style='text-align:center; font-weight:600; white-space:nowrap;'>"
+        "PSI data</div>",
+        unsafe_allow_html=True,
+    )
 
     for folder, folder_files in categories.items():
         with st.expander(f"📁 {folder}", expanded=False):
