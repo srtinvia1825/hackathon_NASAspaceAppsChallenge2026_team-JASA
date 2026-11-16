@@ -48,7 +48,17 @@ with st.sidebar:
     )
     categories = {"Combustion Science": pdf_files}
 
-    st.subheader("🗂️ PSI data")
+    logo_col, title_col = st.columns([1, 4])
+
+with logo_col:
+    st.image("assets/nasa-logo.png", width=36)
+
+with title_col:
+    st.markdown(
+        "<h3 style='text-align: center;'>PSI data</h3>",
+        unsafe_allow_html=True
+    )
+
     for folder, folder_files in categories.items():
         with st.expander(f"📁 {folder}", expanded=False):
             if folder_files:
@@ -58,7 +68,7 @@ with st.sidebar:
                 st.info("No PDF files found in this folder.")
     
     # Botón para reindexar
-    reindex = st.button("🔄 Reindex Documents", use_container_width=True)
+    reindex = st.button("Reindex Documents", use_container_width=True)
 
 # Inicializar motor RAG en el estado de la sesión
 if "rag" not in st.session_state or reindex:
@@ -104,7 +114,7 @@ if user_prompt := st.chat_input("Ask anything about the loaded data..."):
                 st.markdown(result["answer"])
                 
                 if result["sources"]:
-                    with st.expander("📚 Checked recources"):
+                    with st.expander("📚 Checked sources"):
                         for chunk, score in result["sources"]:
                             st.caption(f"**{chunk['source']}** (Similitud: {score:.2f})")
                             st.text(chunk["text"][:300] + ("..." if len(chunk["text"]) > 300 else ""))
