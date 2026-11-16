@@ -1,63 +1,41 @@
-# 🚀 NASA Hackathon 2026 - Asistente RAG con Gemini y Streamlit
+## 📖 Overview
 
-Sistema de Inteligencia Artificial RAG (Retrieval-Augmented Generation) para responder preguntas fundamentadas en conjuntos de datos y documentos locales usando la API de Gemini 2.5.
+*Flame in Freefall* is an Artificial Intelligence system designed to ingest, classify, and present NASA’s extensive historical and experimental datasets on *microgravity combustion and spacecraft fire safety* in a clear, structured, and accessible format.
 
-## 📋 Estructura del Proyecto
-
-```text
-├── data/                  <- Carpeta donde colocas tus archivos (.txt, .md, .pdf, .csv, .json)
-│   └── ejemplo_nasa.txt   <- Archivo de prueba
-├── agent.py               <- Ejecución en consola / terminal
-├── app.py                 <- Aplicación web interactiva con Streamlit
-├── rag_engine.py          <- Motor RAG (embeddings, búsqueda coseno matricial y Gemini)
-├── requirements.txt       <- Dependencias del proyecto
-├── .gitignore             <- Protege tu API key y cachés locales
-└── .env.example           <- Plantilla de variables de entorno
-```
-
-## 🛠️ Instalación y Uso Local
-
-### 1. Clonar o abrir el proyecto
-Asegúrate de estar en la carpeta del proyecto en tu terminal.
-
-### 2. Configurar la API Key
-Obtén tu clave gratuita en [Google AI Studio](https://aistudio.google.com/).
-Crea un archivo llamado `.env` en la raíz del proyecto con el siguiente contenido:
-
-```bash
-GEMINI_API_KEY=tu_api_key_aqui
-```
-
-### 3. Instalar dependencias
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Ejecutar la Aplicación Web
-```bash
-streamlit run app.py
-```
-Se abrirá automáticamente tu navegador en `http://localhost:8501`.
+In microgravity environments (such as the International Space Station), fire behaves radically differently than on Earth—forming spherical flames, propagating under unique atmospheric conditions, and posing critical risks to crewed missions. This project leverages trained machine learning models to transform complex telemetry, research papers, and experimental logs into actionable, easy-to-navigate insights.
 
 ---
 
-## 🌐 Publicación en la Web (Gratis y Pública para todo el mundo)
+## 🎯 Key Objectives
 
-1. **Subir a GitHub**:
-   * Inicializa tu repositorio Git:
-     ```bash
-     git init
-     git add .
-     git commit -m "Initial commit - NASA Hackathon RAG"
-     ```
-   * Súbelo a tu repositorio de GitHub. *(Nota: El archivo `.gitignore` ya está configurado para que tu clave secreta `.env` nunca se suba)*.
+* *Automated Data Classification:* Categorize decades of unstructured and structured NASA combustion data (e.g., FLEX, Saffire, and Burning and Suppression of Solids experiments).
+* *Simplified Knowledge Retrieval:* Translate dense aerospace telemetry and scientific documentation into clean, human-readable summaries and structured taxonomies.
+* *Fire Safety Intelligence:* Identify flammability thresholds, material ignition risks, and suppression dynamics to support safer spacecraft design and mission protocols.
 
-2. **Desplegar en Streamlit Community Cloud**:
-   * Entra en [share.streamlit.io](https://share.streamlit.io/) e inicia sesión con tu cuenta de GitHub.
-   * Haz clic en **"New app"**.
-   * Selecciona tu repositorio y la rama `main`, indicando que el archivo principal es `app.py`.
-   * En la sección **Advanced settings -> Secrets**, añade tu clave:
-     ```toml
-     GEMINI_API_KEY = "tu_clave_real_aqui"
-     ```
-   * Haz clic en **Deploy**. ¡En 1 minuto tendrás un enlace público `https://tu-app.streamlit.app` accesible por cualquier persona!
+---
+
+## 🧠 System Architecture & Workflow
+
+The AI pipeline was designed and trained through the following stages:
+
+1. *Data Ingestion:* Collection of open-source datasets from the NASA Physical Sciences Informatics (PSI) database and technical reports.
+2. *Preprocessing & Feature Extraction:* Cleaning telemetry logs (temperature, pressure, $O_2$/$CO_2$ concentrations) and parsing scientific text using Natural Language Processing (NLP).
+3. *Model Training & Classification:* Supervised and unsupervised learning algorithms trained to tag experiments by material type, flame geometry, extinction behavior, and risk level.
+4. *Structured Presentation Layer:* Outputting organized datasets, visual dashboards, and searchable records for researchers, engineers, and students.
+
+---
+
+## 📂 Repository Structure
+
+```text
+flame-in-freefall/
+├── data/                   # Raw and processed NASA microgravity datasets
+├── models/                 # Trained AI classification weights and architectures
+├── notebooks/              # Exploratory Data Analysis (EDA) and training pipelines
+├── src/
+│   ├── ingestion/          # Scripts for parsing NASA data logs and PDFs
+│   ├── classifier/         # Core AI classification and NLP tagging logic
+│   └── visualization/      # Tools for clean data presentation and reporting
+├── docs/                   # Technical documentation and taxonomy guides
+├── requirements.txt        # Project dependencies
+└── README.md               # Project documentation
