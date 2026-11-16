@@ -8,6 +8,9 @@ from collections import Counter
 from typing import List, Dict, Tuple
 from google import genai
 from google.genai import types
+from docx import Document
+from openpyxl import load_workbook
+from pptx import Presentation
 
 try:
     from pypdf import PdfReader
@@ -21,7 +24,7 @@ def tokenize(text: str) -> List[str]:
     return re.findall(r'\b[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ]{2,}\b', text.lower())
 
 def extract_text_from_file(file_path: str) -> str:
-    """Extrae texto de archivos .txt, .md, .pdf, .csv o .json."""
+    """Extrae texto de archivos de texto, PDF, CSV y documentos de Office."""
     ext = os.path.splitext(file_path)[1].lower()
     try:
         if ext in [".txt", ".md", ".csv", ".json"]:
@@ -36,6 +39,38 @@ def extract_text_from_file(file_path: str) -> str:
                 page_text = page.extract_text()
                 if page_text:
                     text.append(page_text)
+            return "\n".join(text)
+        elif ext == ".xlsx":
+            workbook = load_workbook(file_path, read_only=True, data_only=True)
+            try:
+                text = []
+                for worksheet in workbook.worksheets:
+                    text.append(f"[Sheet: {worksheet.title}]")
+                    for row in worksheet.iter_rows(values_only=True):
+                        values = [str(value) for value in row if value is not None]
+                        if values:
+                            text.append("\t".join(values))
+                return "\n".join(text)
+            finally:
+                workbook.close()
+        elif ext == ".docx":
+            document = Document(file_path)
+            text = [paragraph.text for paragraph in document.paragraphs if paragraph.text.strip()]
+            for table in document.tables:
+                for row in table.rows:
+                    text.append("\t".join(cell.text for cell in row.cells))
+            return "\n".join(text)
+        elif ext == ".pptx":
+            presentation = Presentation(file_path)
+            text = []
+            for slide_number, slide in enumerate(presentation.slides, start=1):
+                text.append(f"[Slide {slide_number}]")
+                for shape in slide.shapes:
+                    if shape.has_text_frame and shape.text.strip():
+                        text.append(shape.text)
+                    if shape.has_table:
+                        for row in shape.table.rows:
+                            text.append("\t".join(cell.text for cell in row.cells))
             return "\n".join(text)
     except Exception as e:
         print(f"Error leyendo {file_path}: {e}")
@@ -118,20 +153,48 @@ class RAGEngine:
         self.embeddings: np.ndarray = np.array([])
         self.bm25_index: LocalBM25Index = None
         self.use_local_bm25 = False
+        self.data_loaded = False
 
     def load_data(self, data_dir: str = "data") -> int:
-        """Carga documentos de la carpeta data/ y los fragmenta."""
+        """Carga documentos de una o varias carpetas/archivos y los fragmenta."""
         all_chunks = []
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir, exist_ok=True)
-            return 0
+        if isinstance(data_dir, (str, os.PathLike)):
+            data_sources = [os.fspath(data_dir)]
+        else:
+            data_sources = [os.fspath(source) for source in data_dir]
 
-        files = glob.glob(os.path.join(data_dir, "**", "*.*"), recursive=True)
-        valid_exts = {".txt", ".md", ".pdf", ".csv", ".json"}
-        valid_files = [f for f in files if os.path.splitext(f)[1].lower() in valid_exts]
+        if len(data_sources) == 1 and not os.path.exists(data_sources[0]):
+            os.makedirs(data_sources[0], exist_ok=True)
 
-        for file_path in valid_files:
-            rel_name = os.path.relpath(file_path, data_dir)
+        valid_exts = {".txt", ".md", ".pdf", ".csv", ".json", ".xlsx", ".docx", ".pptx"}
+        valid_files = []
+        seen_files = set()
+        include_source_dir = len(data_sources) > 1
+
+        for source in data_sources:
+            if os.path.isfile(source):
+                source_dir = os.path.dirname(source)
+                files = [source]
+            elif os.path.isdir(source):
+                source_dir = source
+                files = glob.glob(os.path.join(source, "**", "*.*"), recursive=True)
+            else:
+                continue
+
+            for file_path in files:
+                if os.path.splitext(file_path)[1].lower() not in valid_exts:
+                    continue
+                file_key = os.path.normcase(os.path.abspath(file_path))
+                if file_key in seen_files:
+                    continue
+                seen_files.add(file_key)
+                rel_name = os.path.relpath(file_path, source_dir)
+                if include_source_dir:
+                    source_name = os.path.basename(os.path.normpath(source_dir if os.path.isfile(source) else source))
+                    rel_name = os.path.join(source_name, rel_name)
+                valid_files.append((file_path, rel_name))
+
+        for file_path, rel_name in valid_files:
             content = extract_text_from_file(file_path)
             if content.strip():
                 file_chunks = chunk_text(content, source=rel_name)
@@ -139,6 +202,7 @@ class RAGEngine:
 
         self.chunks = all_chunks
         self.bm25_index = LocalBM25Index(self.chunks)
+        self.data_loaded = True
         return len(self.chunks)
 
     def build_index(self, force_refresh: bool = False):
@@ -148,7 +212,7 @@ class RAGEngine:
         except Exception:
             pass
 
-        if not self.chunks:
+        if not self.data_loaded:
             self.load_data()
 
         # Siempre construir BM25 de respaldo primero (nunca falla)
