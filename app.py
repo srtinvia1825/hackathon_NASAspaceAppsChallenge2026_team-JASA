@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # Encabezado principal
-st.title("SI assistant - Flame in free fall challenge")
+st.title("AI assistant - Flame in free fall challenge")
 st.caption("AI organizer for the NASA PSI documents")
 
 # Barra lateral para configuración
@@ -50,14 +50,14 @@ with st.sidebar:
 
     logo_col, title_col = st.columns([1, 4])
 
-with logo_col:
-    st.image("assets/c:\\Users\\santi\\OneDrive\\Imágenes\\nasa-logo.png", width=36)
+    with logo_col:
+        st.image("assets/nasa-logo.png", width=36)
 
-with title_col:
-    st.markdown(
-        "<h3 style='text-align: center;'>PSI data</h3>",
-        unsafe_allow_html=True
-    )
+    with title_col:
+        st.markdown(
+            "<h3 style='text-align: center;'>PSI data</h3>",
+            unsafe_allow_html=True
+        )
 
     for folder, folder_files in categories.items():
         with st.expander(f"📁 {folder}", expanded=False):
