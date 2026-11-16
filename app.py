@@ -59,9 +59,8 @@ with logo_col:
 
 with title_col:
     st.markdown(
-        "<div style='text-align:center; font-weight:600; white-space:nowrap;'>"
-        "PSI data</div>",
-        unsafe_allow_html=True,
+        "<h3 style='text-align: left;'>PSI data</h3>",
+        unsafe_allow_html=True
     )
 
     for folder, folder_files in categories.items():
