@@ -55,7 +55,7 @@ with st.sidebar:
 
     with title_col:
         st.markdown(
-            "<h3 style='text-align: center;'>PSI data</h3>",
+            "<h3 style='text-align: left;'>PSI data</h3>",
             unsafe_allow_html=True
         )
 
