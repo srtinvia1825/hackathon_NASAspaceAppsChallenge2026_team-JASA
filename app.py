@@ -51,7 +51,7 @@ with st.sidebar:
     logo_col, title_col = st.columns([1, 4])
 
 with logo_col:
-    st.image("assets/nasa-logo.png", width=36)
+    st.image("assets/c:\\Users\\santi\\OneDrive\\Imágenes\\nasa-logo.png", width=36)
 
 with title_col:
     st.markdown(
