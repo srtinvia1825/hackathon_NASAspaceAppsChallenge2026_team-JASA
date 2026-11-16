@@ -40,13 +40,19 @@ with st.sidebar:
     # 2. Explorador de documentos en data/
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
-    pdf_files = sorted(
-        os.path.relpath(os.path.join(root, filename), data_dir)
-        for root, _, filenames in os.walk(data_dir)
-        for filename in filenames
-        if filename.lower().endswith(".pdf") and not filename.startswith(".")
-    )
-    categories = {"Combustion Science": pdf_files}
+    category_names = [
+        "Archived Combustion Science",
+        "Multiphysics CFD Analysis of Thermo-Convective Effects on Cool Flame Dynamics",
+    ]
+    categories = {}
+    for folder in category_names:
+        category_dir = os.path.join(data_dir, folder)
+        categories[folder] = sorted(
+            os.path.relpath(os.path.join(root, filename), category_dir)
+            for root, _, filenames in os.walk(category_dir)
+            for filename in filenames
+            if filename.lower().endswith(".pdf") and not filename.startswith(".")
+        )
 
     logo_col, title_col = st.columns([1, 4])
 
@@ -128,3 +134,4 @@ if user_prompt := st.chat_input("Ask anything about the loaded data..."):
                 error_msg = f"An error occurred while processing your query: {e}"
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                
