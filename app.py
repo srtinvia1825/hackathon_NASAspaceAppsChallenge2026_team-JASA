@@ -37,8 +37,9 @@ with st.sidebar:
 
     st.divider()
 
-    # 2. Explorador de documentos en data/
-    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    # 2. Explorador de documentos en las carpetas de categorías
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(project_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     category_names = [
         "Researcher´s guide to combustion science",
@@ -58,17 +59,43 @@ with st.sidebar:
         "SLICE": ["slice"],
     }
 
+    def find_category_dir(parent, category):
+        if not os.path.isdir(parent):
+            return None
+        for entry in os.scandir(parent):
+            if entry.is_dir() and entry.name.casefold() == category.casefold():
+                return entry.path
+        return None
+
+    category_dirs = {}
+    document_sources = []
+    for folder in category_names:
+        target_dir = find_category_dir(project_dir, folder) or find_category_dir(data_dir, folder)
+        category_dirs[folder] = target_dir
+        if target_dir:
+            document_sources.append(target_dir)
+
+    supported_extensions = (".pdf", ".csv", ".xlsx", ".docx", ".pptx")
+    if os.path.isdir(data_dir):
+        document_sources.extend(
+            os.path.join(data_dir, filename)
+            for filename in os.listdir(data_dir)
+            if os.path.isfile(os.path.join(data_dir, filename))
+            and filename.lower().endswith(supported_extensions)
+            and not filename.startswith(".")
+        )
+
     categories = {}
     assigned_files = set()
 
-    # Paso A: Buscar primero dentro de subcarpetas reales
+    # Paso A: Buscar cada categoría primero en la raíz y luego en data/
     for folder in category_names:
-        target_dir = os.path.join(data_dir, folder)
+        target_dir = category_dirs[folder]
         found_files = []
-        if os.path.isdir(target_dir):
+        if target_dir:
             for root, _, filenames in os.walk(target_dir):
                 for filename in filenames:
-                    if filename.lower().endswith(".pdf") and not filename.startswith("."):
+                    if filename.lower().endswith(supported_extensions) and not filename.startswith("."):
                         found_files.append(os.path.relpath(os.path.join(root, filename), target_dir))
                         assigned_files.add(filename)
         categories[folder] = sorted(found_files)
@@ -93,9 +120,17 @@ with st.sidebar:
     other_pdfs = [f for f in loose_pdfs if f not in assigned_files]
 
     logo_col, title_col = st.columns([1, 4])
+    logo_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "assets",
+        "nasa-logo.png",
+    )
 
     with logo_col:
-        st.image("assets/nasa-logo.png", width=36)
+        if os.path.isfile(logo_path):
+            st.image(logo_path, width=36)
+        else:
+            st.warning("NASA logo not found. Include assets/nasa-logo.png in the repository.")
 
     with title_col:
         st.markdown(
@@ -109,7 +144,7 @@ with st.sidebar:
                 for filename in folder_files:
                     st.markdown(f"- 📄 `{filename}`")
             else:
-                st.info("No PDF files found in this folder.")
+                st.info("No supported documents found in this folder.")
 
     if other_pdfs:
         with st.expander("📁 Other Documents", expanded=False):
@@ -124,7 +159,7 @@ if "rag" not in st.session_state or reindex:
     with st.spinner("Loading documents and building index..."):
         try:
             rag = RAGEngine(api_key=api_key)
-            rag.load_data(data_dir=data_dir)
+            rag.load_data(data_dir=document_sources)
             rag.build_index(force_refresh=reindex)
             st.session_state["rag"] = rag
         except Exception as e:
