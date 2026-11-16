@@ -38,7 +38,7 @@ with st.sidebar:
     st.divider()
 
     # 2. Explorador de documentos en data/
-    data_dir = "data"
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     os.makedirs(data_dir, exist_ok=True)
     category_names = ["Researcher´s guide to combustion science", "ACME", "BASS", "DAFT", "FLEX", "SAME", "SPICE", "Saffire", "SLICE"]
     categories = {}
