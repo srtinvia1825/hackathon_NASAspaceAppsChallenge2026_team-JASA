@@ -40,16 +40,57 @@ with st.sidebar:
     # 2. Explorador de documentos en data/
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     os.makedirs(data_dir, exist_ok=True)
-    category_names = ["Researcher´s guide to combustion science", "ACME", "BASS", "DAFT", "FLEX", "SAME", "SPICE", "Saffire", "SLICE"]
+    category_names = [
+        "Researcher´s guide to combustion science",
+        "ACME", "BASS", "DAFT", "FLEX", "SAME", "SPICE", "Saffire", "SLICE"
+    ]
+
+    # Palabras clave de respaldo para asociar archivos sueltos en data/ si no están en subcarpetas
+    category_keywords = {
+        "Researcher´s guide to combustion science": ["combustion", "guide", "mini-book", "np-2015"],
+        "ACME": ["acme"],
+        "BASS": ["bass"],
+        "DAFT": ["daft"],
+        "FLEX": ["flex"],
+        "SAME": ["same"],
+        "SPICE": ["spice"],
+        "Saffire": ["saffire"],
+        "SLICE": ["slice"],
+    }
+
     categories = {}
+    assigned_files = set()
+
+    # Paso A: Buscar primero dentro de subcarpetas reales
     for folder in category_names:
-        category_dir = os.path.join(data_dir, folder)
-        categories[folder] = sorted(
-            os.path.relpath(os.path.join(root, filename), category_dir)
-            for root, _, filenames in os.walk(category_dir)
-            for filename in filenames
-            if filename.lower().endswith(".pdf") and not filename.startswith(".")
-        )
+        target_dir = os.path.join(data_dir, folder)
+        found_files = []
+        if os.path.isdir(target_dir):
+            for root, _, filenames in os.walk(target_dir):
+                for filename in filenames:
+                    if filename.lower().endswith(".pdf") and not filename.startswith("."):
+                        found_files.append(os.path.relpath(os.path.join(root, filename), target_dir))
+                        assigned_files.add(filename)
+        categories[folder] = sorted(found_files)
+
+    # Paso B: Si alguna carpeta está vacía, buscar en PDFs sueltos en la raíz de data/
+    loose_pdfs = [
+        f for f in os.listdir(data_dir)
+        if os.path.isfile(os.path.join(data_dir, f)) and f.lower().endswith(".pdf") and not f.startswith(".")
+    ]
+
+    for folder, kws in category_keywords.items():
+        if not categories[folder]:
+            matched = []
+            for f in loose_pdfs:
+                f_lower = f.lower()
+                if any(kw in f_lower for kw in kws):
+                    matched.append(f)
+                    assigned_files.add(f)
+            categories[folder] = sorted(matched)
+
+    # Paso C: Documentos adicionales que no coincidan con las 9 carpetas
+    other_pdfs = [f for f in loose_pdfs if f not in assigned_files]
 
     logo_col, title_col = st.columns([1, 4])
 
@@ -69,6 +110,11 @@ with st.sidebar:
                     st.markdown(f"- 📄 `{filename}`")
             else:
                 st.info("No PDF files found in this folder.")
+
+    if other_pdfs:
+        with st.expander("📁 Other Documents", expanded=False):
+            for filename in other_pdfs:
+                st.markdown(f"- 📄 `{filename}`")
     
     # Botón para reindexar
     reindex = st.button("Reindex Documents", use_container_width=True)
