@@ -1,4 +1,4 @@
-## 📖 Overview
+## Overview
 
 *Flame in Freefall* is an Artificial Intelligence system designed to ingest, classify, and present NASA’s extensive historical and experimental datasets on *microgravity combustion and spacecraft fire safety* in a clear, structured, and accessible format.
 
@@ -6,7 +6,7 @@ In microgravity environments (such as the International Space Station), fire beh
 
 ---
 
-## 🎯 Key Objectives
+##  Key Objectives
 
 * *Automated Data Classification:* Categorize decades of unstructured and structured NASA combustion data (e.g., FLEX, Saffire, and Burning and Suppression of Solids experiments).
 * *Simplified Knowledge Retrieval:* Translate dense aerospace telemetry and scientific documentation into clean, human-readable summaries and structured taxonomies.
@@ -14,7 +14,7 @@ In microgravity environments (such as the International Space Station), fire beh
 
 ---
 
-## 🧠 System Architecture & Workflow
+##  System Architecture & Workflow
 
 The AI pipeline was designed and trained through the following stages:
 
